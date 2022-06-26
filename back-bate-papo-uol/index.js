@@ -119,8 +119,10 @@ app.get("/messages", async (req, res) => {
   let messages;
 
   try {
-    const participant = await db.collection("participants").findOne({name: user});
-    if(!participant) {
+    const participant = await db
+      .collection("participants")
+      .findOne({ name: user });
+    if (!participant) {
       res.sendStatus(404);
       return;
     }
@@ -128,7 +130,11 @@ app.get("/messages", async (req, res) => {
     res.sendStatus(500);
   }
   try {
-    messages = await db.collection("messages").find().sort({ $natural: -1 }).toArray();
+    messages = await db
+      .collection("messages")
+      .find()
+      .sort({ $natural: -1 })
+      .toArray();
     res.send(messages);
   } catch (error) {
     console.error(error);
@@ -136,13 +142,17 @@ app.get("/messages", async (req, res) => {
   }
 
   const messagesVal = messages.filter((message) => {
-    if(message.to === ("Todos") || message.to === user || message.from === user){
+    if (
+      message.to === "Todos" ||
+      message.to === user ||
+      message.from === user
+    ) {
       return message;
     }
     return false;
   });
 
-  let messagesVisible = [];
+  /*   let messagesVisible = [];
   let limite;
   if(limit){
     limite = parseInt(limit);
@@ -161,7 +171,7 @@ app.get("/messages", async (req, res) => {
       }
     }
   }
-  res.send(messagesVisible);
+  res.send(messagesVisible); */
 });
 
 /* Status Routes */
@@ -190,7 +200,41 @@ app.post("/status", async (req, res) => {
   res.sendStatus(200);
 });
 
-//
+//USER INATIVO
+setInterval(async () => {
+  let users;
+  try {
+    users = await db.collection("participants").find().toArray();
+  } catch (error) {
+    console.log(error);
+  }
+  for (let i = 0; i < users.length; i++) {
+    //let time = Date.now();
+    if (Date.now() - users[i].lastStatus >= 10000) {
+      let deleteUser;
+      try {
+        deleteUser = await db
+          .collection("participants")
+          .deleteOne({ name: users[i].name });
+        if (deleteUser) {
+          try {
+            await db.collection("messages").insertOne({
+              from: users[i].name,
+              to: "Todos",
+              text: "sai da sala...",
+              type: "status",
+              time: dayjs().format("HH:mm:ss"),
+            });
+          } catch (error) {
+            console.log(error);
+          }
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  }
+}, 15000);
 
 app.listen(5000, () => {
   console.log("Server is litening on port 5000.");
