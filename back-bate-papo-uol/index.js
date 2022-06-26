@@ -18,7 +18,7 @@ app.use(cors());
 app.use(express.json());
 
 const participantsSchema = Joi.object({
-  name: Joi.string().min(1).required(),
+  name: Joi.string().min(1).required,
 });
 
 const messageSchema = Joi.object({
@@ -43,36 +43,30 @@ app.get("/participants", async (req, res) => {
 //POST
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
-  const validacao = participantsSchema.validate({ name: name });
-  const { error } = validacao;
+  const { error } = participantsSchema.validate(name);
 
-  if (error) {
-    const details = error.details.map((e) => e.message);
-    res.status(422).send(details);
-    return;
-  }
-
-  const participant = await db
-    .collection("participants")
-    .findOne({ name: req.body });
-
-  if (participant) {
-    res.sendStatus(409);
-    return;
-  }
+  /* if (error) {
+    const detalhes = error.details.map((detail) => detail.message);
+    res.status(422).send(detalhes);
+  } */
 
   try {
-    await db
-      .collection("participants")
-      .insertOne({ name: name, lastStatus: Date.now() });
-    await db.collection("message").insertOne({
-      from: name,
-      to: "Todos",
-      text: "entra na sala...",
-      type: "status",
-      time: dayjs().format("HH:mm:ss"),
-    });
-    res.sendStatus(201);
+    const user = await db.collection("participants").findOne(req.body);
+    if (user) {
+      res.sendStatus(409);
+    } else {
+      await db
+        .collection("participants")
+        .insertOne({ name: name, lastStatus: Date.now() });
+      await db.collection("message").insertOne({
+        from: name,
+        to: "Todos",
+        text: "entra na sala...",
+        type: "status",
+        time: dayjs().format("HH:mm:ss"),
+      });
+      res.sendStatus(201);
+    }
   } catch (error) {
     res.sendStatus(500);
   }
@@ -96,22 +90,23 @@ app.post("/messages", async (req, res) => {
     res.status(422).send(details);
     return;
   } */
-  /*  const participant = await db.collection("participants").findOne(user);
-
-  if(!participant){
-    res.status(422).send("No valid user!!");
-    return;
-  } */
 
   try {
-    await db.collection("messages").insertOne({
-      from: user,
-      to: to,
-      text: text,
-      type: type,
-      time: dayjs().format("HH:mm:ss"),
-    });
-    res.sendStatus(201);
+    const participant = await db.collection("participants").findOne(user);
+
+    if (!participant) {
+      res.sendStatus(422);
+      return;
+    } else {
+      await db.collection("messages").insertOne({
+        from: user,
+        to: to,
+        text: text,
+        type: type,
+        time: dayjs().format("HH:mm:ss"),
+      });
+      res.sendStatus(201);
+    }
   } catch (error) {
     res.sendStatus(500);
   }
@@ -119,13 +114,54 @@ app.post("/messages", async (req, res) => {
 
 //GET
 app.get("/messages", async (req, res) => {
+  const { limit } = req.query;
+  const { user } = req.headers;
+  let messages;
+
   try {
-    const messages = await db.collection("messages").find().toArray();
+    const participant = await db.collection("participants").findOne({name: user});
+    if(!participant) {
+      res.sendStatus(404);
+      return;
+    }
+  } catch (error) {
+    res.sendStatus(500);
+  }
+  try {
+    messages = await db.collection("messages").find().sort({ $natural: -1 }).toArray();
     res.send(messages);
   } catch (error) {
     console.error(error);
     res.sendStatus(500);
   }
+
+  const messagesVal = messages.filter((message) => {
+    if(message.to === ("Todos") || message.to === user || message.from === user){
+      return message;
+    }
+    return false;
+  });
+
+  let messagesVisible = [];
+  let limite;
+  if(limit){
+    limite = parseInt(limit);
+    for(let i = 0; i < limite; i++){
+      messagesVisible.push(messagesVal[i]);
+      if(i === messagesVal.length -1){
+        break;
+      }
+    }
+  }else{
+    limite = 100;
+    for(let i = 0; i < limite; i++){
+      messagesVisible.push(messagesVal[i]);
+      if(i === messagesVal.length -1){
+        break;
+      }
+    }
+  }
+  res.send(messagesVisible);
 });
 
 /* Status Routes */
@@ -153,6 +189,8 @@ app.post("/status", async (req, res) => {
   }
   res.sendStatus(200);
 });
+
+//
 
 app.listen(5000, () => {
   console.log("Server is litening on port 5000.");
