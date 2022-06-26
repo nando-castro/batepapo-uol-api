@@ -3,8 +3,7 @@ import cors from "cors";
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 import dayjs from "dayjs";
-import joi from "joi";
-import e from "express";
+import Joi from "joi";
 dotenv.config();
 
 const mongoClient = new MongoClient(process.env.MONGO_URI);
@@ -18,14 +17,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const participantsSchema = joi.object({
-  name: joi.string().min(1).required(),
+const participantsSchema = Joi.object({
+  name: Joi.string().min(1).required(),
 });
 
-const messageSchema = joi.object({
-  to: joi.string().min(1).required(),
-  text: joi.string().min(1).required(),
-  type: joi.string().valid("message", "private_message").required(),
+const messageSchema = Joi.object({
+  to: Joi.string().min(1).required(),
+  text: Joi.string().min(1).required(),
+  type: Joi.string().valid("message", "private_message").required(),
 });
 
 /* Participants Routes */
@@ -44,7 +43,7 @@ app.get("/participants", async (req, res) => {
 //POST
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
-  const validacao = participantsSchema.validate({name: name});
+  const validacao = participantsSchema.validate({ name: name });
   const { error } = validacao;
 
   if (error) {
@@ -53,9 +52,11 @@ app.post("/participants", async (req, res) => {
     return;
   }
 
-  const participant = await db.collection("participants").findOne({name: req.body});
+  const participant = await db
+    .collection("participants")
+    .findOne({ name: req.body });
 
-  if(participant){
+  if (participant) {
     res.sendStatus(409);
     return;
   }
@@ -85,7 +86,7 @@ app.post("/messages", async (req, res) => {
   //const message = req.body;
 
   const { user } = req.headers;
-  
+
   /* const validacao = messageSchema.validate(to, text, type, user);
   
   const { error } = validacao;
@@ -95,7 +96,7 @@ app.post("/messages", async (req, res) => {
     res.status(422).send(details);
     return;
   } */
- /*  const participant = await db.collection("participants").findOne(user);
+  /*  const participant = await db.collection("participants").findOne(user);
 
   if(!participant){
     res.status(422).send("No valid user!!");
@@ -130,10 +131,29 @@ app.get("/messages", async (req, res) => {
 /* Status Routes */
 
 //POST
-/* app.post("/status", async (req, res) => {
+app.post("/status", async (req, res) => {
   const user = req.headers.user;
+  try {
+    const participant = await db
+      .collection("participants")
+      .findOne({ name: user });
+    if (!participant) {
+      res.sendStatus(404);
+      return;
+    }
+  } catch (error) {
+    res.sendStatus(500);
+  }
+  try {
+    await db
+      .collection("users")
+      .updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
+  } catch (error) {
+    res.status(500).send(error);
+  }
+  res.sendStatus(200);
 });
- */
+
 app.listen(5000, () => {
   console.log("Server is litening on port 5000.");
   console.log("http://localhost:5000");
