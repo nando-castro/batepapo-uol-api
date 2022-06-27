@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import dayjs from "dayjs";
 import Joi from "joi";
@@ -114,7 +114,14 @@ app.post("/messages", async (req, res) => {
 
 //GET
 app.get("/messages", async (req, res) => {
-  const { limit } = req.query;
+  try {
+    const messages = await db.collection("messages").find().toArray();
+    res.send(messages);
+  } catch (error) {
+    console.error(error);
+    res.sendStatus(500);
+  }
+  /* const { limit } = req.query;
   const { user } = req.headers;
   let messages;
 
@@ -150,7 +157,7 @@ app.get("/messages", async (req, res) => {
       return message;
     }
     return false;
-  });
+  }); */
 
   /*   let messagesVisible = [];
   let limite;
@@ -172,6 +179,26 @@ app.get("/messages", async (req, res) => {
     }
   }
   res.send(messagesVisible); */
+});
+
+//DELETE
+app.delete("/messages/:id",async (req, res) => {
+  const id = req.params.id;
+
+  const msg = await db.collection("messages").findOne({ _id: new ObjectId(id)})
+
+  if(!msg){
+    res.sendStatus(422);
+  }
+
+  try {
+    await db.collection("messages").deleteOne({ _id: new ObjectId(id) });
+
+    res.sendStatus(201);
+  } catch (error) {
+    console.error(error);
+    res.sendStatus(500);
+  }
 });
 
 /* Status Routes */
@@ -201,7 +228,7 @@ app.post("/status", async (req, res) => {
 });
 
 //USER INATIVO
-setInterval(async () => {
+/* setInterval(async () => {
   let users;
   try {
     users = await db.collection("participants").find().toArray();
@@ -234,7 +261,7 @@ setInterval(async () => {
       }
     }
   }
-}, 15000);
+}, 15000); */
 
 app.listen(5000, () => {
   console.log("Server is litening on port 5000.");
