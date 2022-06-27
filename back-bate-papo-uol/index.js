@@ -45,15 +45,16 @@ app.post("/participants", async (req, res) => {
   const { name } = req.body;
   const { error } = participantsSchema.validate(name);
 
-  /* if (error) {
+  if (error) {
     const detalhes = error.details.map((detail) => detail.message);
     res.status(422).send(detalhes);
-  } */
+  }
 
   try {
-    const user = await db.collection("participants").findOne(req.body);
+    const user = await db.collection("participants").findOne({name:name});
     if (user) {
       res.sendStatus(409);
+      return;
     } else {
       await db
         .collection("participants")
@@ -81,7 +82,7 @@ app.post("/messages", async (req, res) => {
 
   const { user } = req.headers;
 
-  /* const validacao = messageSchema.validate(to, text, type, user);
+  const validacao = messageSchema.validate(to, text, type, user);
   
   const { error } = validacao;
   
@@ -89,8 +90,8 @@ app.post("/messages", async (req, res) => {
     const details = error.details.map((e) => e.message);
     res.status(422).send(details);
     return;
-  } */
-
+  }
+  
   try {
     const participant = await db.collection("participants").findOne(user);
 
@@ -114,14 +115,16 @@ app.post("/messages", async (req, res) => {
 
 //GET
 app.get("/messages", async (req, res) => {
-  try {
+  /* try {
     const messages = await db.collection("messages").find().toArray();
     res.send(messages);
   } catch (error) {
     console.error(error);
     res.sendStatus(500);
-  }
-  /* const { limit } = req.query;
+  } */
+
+
+  const { limit } = req.query;
   const { user } = req.headers;
   let messages;
 
@@ -157,9 +160,9 @@ app.get("/messages", async (req, res) => {
       return message;
     }
     return false;
-  }); */
+  });
 
-  /*   let messagesVisible = [];
+    let messagesVisible = [];
   let limite;
   if(limit){
     limite = parseInt(limit);
@@ -178,7 +181,7 @@ app.get("/messages", async (req, res) => {
       }
     }
   }
-  res.send(messagesVisible); */
+  res.send(messagesVisible);
 });
 
 //DELETE
@@ -228,7 +231,7 @@ app.post("/status", async (req, res) => {
 });
 
 //USER INATIVO
-/* setInterval(async () => {
+setInterval(async () => {
   let users;
   try {
     users = await db.collection("participants").find().toArray();
@@ -261,7 +264,7 @@ app.post("/status", async (req, res) => {
       }
     }
   }
-}, 15000); */
+}, 15000);
 
 app.listen(5000, () => {
   console.log("Server is litening on port 5000.");
