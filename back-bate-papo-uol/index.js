@@ -18,13 +18,13 @@ app.use(cors());
 app.use(express.json());
 
 const participantsSchema = Joi.object({
-  name: Joi.string().min(1).required,
+  name: Joi.string().min(1).required(),
 });
 
 const messageSchema = Joi.object({
   to: Joi.string().min(1).required(),
   text: Joi.string().min(1).required(),
-  type: Joi.string().valid("message", "private_message").required(),
+  type: Joi.string().valid("message", "private_message"),
 });
 
 /* Participants Routes */
@@ -43,31 +43,30 @@ app.get("/participants", async (req, res) => {
 //POST
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
-  const { error } = participantsSchema.validate(name);
 
+  const { error } = participantsSchema.validate({ name: name });
   if (error) {
-    const detalhes = error.details.map((detail) => detail.message);
-    res.status(422).send(detalhes);
+    res.sendStatus(422);
+    return;
   }
 
   try {
-    const user = await db.collection("participants").findOne({name:name});
+    const user = await db.collection("participants").findOne({ name: name });
     if (user) {
       res.sendStatus(409);
       return;
-    } else {
-      await db
-        .collection("participants")
-        .insertOne({ name: name, lastStatus: Date.now() });
-      await db.collection("message").insertOne({
-        from: name,
-        to: "Todos",
-        text: "entra na sala...",
-        type: "status",
-        time: dayjs().format("HH:mm:ss"),
-      });
-      res.sendStatus(201);
     }
+    await db
+      .collection("participants")
+      .insertOne({ name: name, lastStatus: Date.now() });
+    await db.collection("message").insertOne({
+      from: name,
+      to: "Todos",
+      text: "entra na sala...",
+      type: "status",
+      time: dayjs().format("HH:mm:ss"),
+    });
+    res.sendStatus(201);
   } catch (error) {
     res.sendStatus(500);
   }
@@ -77,37 +76,36 @@ app.post("/participants", async (req, res) => {
 
 //POST
 app.post("/messages", async (req, res) => {
+  const { user } = req.headers;
   const { to, text, type } = req.body;
   //const message = req.body;
 
-  const { user } = req.headers;
-
-  const validacao = messageSchema.validate(to, text, type, user);
-  
+  const validacao = messageSchema.validate({ to: to, text: text, type: type });
   const { error } = validacao;
-  
+
   if (error) {
-    const details = error.details.map((e) => e.message);
-    res.status(422).send(details);
+    console.log(error);
+    res.sendStatus(422);
     return;
   }
-  
+
   try {
-    const participant = await db.collection("participants").findOne(user);
+    const participant = await db
+      .collection("participants")
+      .findOne({ name: user });
 
     if (!participant) {
       res.sendStatus(422);
       return;
-    } else {
-      await db.collection("messages").insertOne({
-        from: user,
-        to: to,
-        text: text,
-        type: type,
-        time: dayjs().format("HH:mm:ss"),
-      });
-      res.sendStatus(201);
     }
+    await db.collection("messages").insertOne({
+      from: user,
+      to: to,
+      text: text,
+      type: type,
+      time: dayjs().format("HH:mm:ss"),
+    });
+    res.sendStatus(201);
   } catch (error) {
     res.sendStatus(500);
   }
@@ -122,7 +120,6 @@ app.get("/messages", async (req, res) => {
     console.error(error);
     res.sendStatus(500);
   } */
-
 
   const { limit } = req.query;
   const { user } = req.headers;
@@ -140,17 +137,12 @@ app.get("/messages", async (req, res) => {
     res.sendStatus(500);
   }
   try {
-    messages = await db
-      .collection("messages")
-      .find()
-      .sort({ $natural: -1 })
-      .toArray();
+    messages = await db.collection("messages").find().toArray();
     res.send(messages);
   } catch (error) {
     console.error(error);
     res.sendStatus(500);
   }
-
   const messagesVal = messages.filter((message) => {
     if (
       message.to === "Todos" ||
@@ -162,22 +154,22 @@ app.get("/messages", async (req, res) => {
     return false;
   });
 
-    let messagesVisible = [];
+  let messagesVisible = [];
   let limite;
-  if(limit){
+  if (limit) {
     limite = parseInt(limit);
-    for(let i = 0; i < limite; i++){
+    for (let i = 0; i < limite; i++) {
       messagesVisible.push(messagesVal[i]);
-      if(i === messagesVal.length -1){
-        break;
+      if (i === messagesVal.length - 1) {
+        return;
       }
     }
-  }else{
+  } else {
     limite = 100;
-    for(let i = 0; i < limite; i++){
+    for (let i = 0; i < limite; i++) {
       messagesVisible.push(messagesVal[i]);
-      if(i === messagesVal.length -1){
-        break;
+      if (i === messagesVal.length - 1) {
+        return;
       }
     }
   }
@@ -185,12 +177,14 @@ app.get("/messages", async (req, res) => {
 });
 
 //DELETE
-app.delete("/messages/:id",async (req, res) => {
+app.delete("/messages/:id", async (req, res) => {
   const id = req.params.id;
 
-  const msg = await db.collection("messages").findOne({ _id: new ObjectId(id)})
+  const msg = await db
+    .collection("messages")
+    .findOne({ _id: new ObjectId(id) });
 
-  if(!msg){
+  if (!msg) {
     res.sendStatus(422);
   }
 
